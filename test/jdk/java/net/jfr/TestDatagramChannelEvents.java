@@ -27,6 +27,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.ServerSocketChannel;
@@ -44,7 +45,7 @@ class TestDatagramChannelEvents {
     }
 
     public static void main(String[] args) throws Exception {
-        enableStreamingAndRun(TestSocketChannelEvents::runTest);
+        enableStreamingAndRun(TestDatagramChannelEvents::runTest);
     }
 
     static void enableStreamingAndRun(ThrowingRunnable task) throws Exception {
@@ -67,8 +68,8 @@ class TestDatagramChannelEvents {
     }
 
     static void runTest() throws Exception {
-        try (var sender = new DatagramSender();
-             var receiver = new DatagramReceiver()) {
+        try (var receiver = new DatagramReceiver();
+             var sender = new DatagramSender(receiver.port)) {
             Thread t1 = new Thread(sender, "Server-Thread");
             Thread t2 = new Thread(receiver, "Client-Thread");
             t1.start();
@@ -81,8 +82,10 @@ class TestDatagramChannelEvents {
     public static class DatagramSender implements Runnable, AutoCloseable {
 
         DatagramSocket sender;
+        int port;
 
-        DatagramSender() throws IOException {
+        DatagramSender(int port) throws IOException {
+            this.port = port;
             sender = new DatagramSocket();
         }
 
@@ -90,7 +93,8 @@ class TestDatagramChannelEvents {
         public void run() {
             try {
                 var buffer = ByteBuffer.wrap(new byte[] { (byte)0xFF });
-                DatagramPacket dp = new DatagramPacket(buffer.array(), 0);
+                System.err.println(InetAddress.getLocalHost());
+                DatagramPacket dp = new DatagramPacket(buffer.array(), 0, InetAddress.getLocalHost(), port);
                 sender.send(dp);
                 buffer.clear();
                 // TBD: Cleanup and send packet to proper receiver
@@ -101,26 +105,35 @@ class TestDatagramChannelEvents {
 
         @Override
         public void close() throws IOException {
-            // TBD: Implement here
+            sender.close();
         }
     }
 
     public static class DatagramReceiver implements Runnable, AutoCloseable {
 
-        // TBD: Fully Implement Datagram Receiver
+        DatagramSocket receiver;
+        int port;
 
         DatagramReceiver() throws Exception {
-
+            receiver = new DatagramSocket();
+            port = receiver.getLocalPort();
         }
 
         @Override
         public void run() {
             var buffer = ByteBuffer.wrap(new byte[1]);
+            DatagramPacket dp = new DatagramPacket(buffer.array(), 0);
+            try {
+                receiver.receive(dp);
+                System.err.println("Received datagram");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
         public void close() throws IOException {
-
+            receiver.close();
         }
     }
 
