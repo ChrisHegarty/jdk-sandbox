@@ -41,6 +41,7 @@ import jdk.jfr.events.FileForceEvent;
 import jdk.jfr.events.FileReadEvent;
 import jdk.jfr.events.FileWriteEvent;
 import jdk.jfr.events.DeserializationEvent;
+import jdk.jfr.events.NetworkingExceptionEvent;
 import jdk.jfr.events.ProcessStartEvent;
 import jdk.jfr.events.SecurityPropertyModificationEvent;
 import jdk.jfr.events.SocketAcceptEvent;
@@ -63,6 +64,7 @@ public final class JDKEvents {
         DatagramReceiveEvent.class,
         DatagramSendEvent.class,
         DeserializationEvent.class,
+        NetworkingExceptionEvent.class,
         ProcessStartEvent.class,
         SecurityPropertyModificationEvent.class,
         SocketAcceptEvent.class,
@@ -86,6 +88,7 @@ public final class JDKEvents {
         jdk.internal.event.DatagramReceiveEvent.class,
         jdk.internal.event.DatagramSendEvent.class,
         jdk.internal.event.DeserializationEvent.class,
+        jdk.internal.event.NetworkingExceptionEvent.class,
         jdk.internal.event.ProcessStartEvent.class,
         jdk.internal.event.SecurityPropertyModificationEvent.class,
         jdk.internal.event.SocketAcceptEvent.class,
