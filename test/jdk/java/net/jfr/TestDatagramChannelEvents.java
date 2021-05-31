@@ -53,15 +53,16 @@ class TestDatagramChannelEvents {
         try (var rs = new RecordingStream()) {
             rs.enable("jdk.DatagramSend").withThreshold(Duration.ofMillis(0)).withStackTrace();
             rs.enable("jdk.DatagramReceive").withThreshold(Duration.ofMillis(0)).withStackTrace();
-            rs.onEvent("jdk.DatagramReceive", event -> {
-                System.out.println("---\nRECEIVED: " + eventToString(event));
-                latch.countDown();
-            });
             rs.onEvent("jdk.DatagramSend", event -> {
                 System.out.println("---\nSENT: " + eventToString(event));
                 latch.countDown();
             });
+            rs.onEvent("jdk.DatagramReceive", event -> {
+                System.out.println("---\nRECEIVED: " + eventToString(event));
+                latch.countDown();
+            });
             rs.startAsync();
+
             task.run();
             latch.await();
         }
@@ -69,9 +70,9 @@ class TestDatagramChannelEvents {
 
     static void runTest() throws Exception {
         try (var receiver = new DatagramReceiver();
-             var sender = new DatagramSender(receiver.port)) {
-            Thread t1 = new Thread(sender, "Server-Thread");
-            Thread t2 = new Thread(receiver, "Client-Thread");
+             var sender = new DatagramSender(receiver.port())) {
+            Thread t1 = new Thread(sender, "Sender-Thread");
+            Thread t2 = new Thread(receiver, "Receiver-Thread");
             t1.start();
             t2.start();
             t1.join();
@@ -81,59 +82,72 @@ class TestDatagramChannelEvents {
 
     public static class DatagramSender implements Runnable, AutoCloseable {
 
-        DatagramSocket sender;
+        DatagramChannel sender;
         int port;
 
         DatagramSender(int port) throws IOException {
+            sender = DatagramChannel.open();
             this.port = port;
-            sender = new DatagramSocket();
         }
 
         @Override
         public void run() {
+            var buffer = ByteBuffer.wrap(new byte[] { (byte)0xFF });
+            buffer.flip();
             try {
-                var buffer = ByteBuffer.wrap(new byte[] { (byte)0xFF });
-                System.err.println(InetAddress.getLocalHost());
-                DatagramPacket dp = new DatagramPacket(buffer.array(), 0, InetAddress.getLocalHost(), port);
-                sender.send(dp);
-                buffer.clear();
-                // TBD: Cleanup and send packet to proper receiver
+                InetAddress addr = InetAddress.getLoopbackAddress();
+                InetSocketAddress isa = new InetSocketAddress(addr, port);
+                sender.send(buffer, isa);
+                System.err.println("Sent Datagram..");
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+            buffer.clear();
         }
 
         @Override
-        public void close() throws IOException {
-            sender.close();
+        public void close() {
+            try {
+                sender.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     public static class DatagramReceiver implements Runnable, AutoCloseable {
 
-        DatagramSocket receiver;
+        DatagramChannel receiver;
         int port;
 
         DatagramReceiver() throws Exception {
-            receiver = new DatagramSocket();
-            port = receiver.getLocalPort();
+            InetSocketAddress address = new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
+            receiver = DatagramChannel.open().bind(address);
+        }
+
+        int port() {
+            return receiver.socket().getLocalPort();
         }
 
         @Override
         public void run() {
             var buffer = ByteBuffer.wrap(new byte[1]);
-            DatagramPacket dp = new DatagramPacket(buffer.array(), 0);
             try {
-                receiver.receive(dp);
-                System.err.println("Received datagram");
+                receiver.receive(buffer);
+                // no need to process buffer as only testing events
+                System.err.println("..Received datagram");
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
 
         @Override
-        public void close() throws IOException {
-            receiver.close();
+        public void close() {
+            try {
+                receiver.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
