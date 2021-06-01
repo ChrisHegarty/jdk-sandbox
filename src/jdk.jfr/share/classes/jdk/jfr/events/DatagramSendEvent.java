@@ -13,6 +13,9 @@ import jdk.jfr.internal.Type;
 @Description("Sending a Datagram")
 @MirrorEvent(className = "jdk.internal.event.DatagramSendEvent")
 public class DatagramSendEvent extends AbstractSocketEvent{
+    @Label("Bytes Sent")
+    public int bytesSent;
+
     @Label("Completed Send")
     public boolean completed;
 
