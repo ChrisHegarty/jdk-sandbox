@@ -26,6 +26,7 @@
 package jdk.internal.event;
 
 public class DatagramReceiveEvent extends AbstractSocketEvent {
+    public int bytesRead;
     public boolean blocking;
     public boolean connected;
     public String exceptionMessage;
