@@ -69,6 +69,9 @@ class TestDatagramChannelEvents {
     }
 
     static void runTest() throws Exception {
+        // TBD: test connected and unconnected cases
+        // TBD: use a security manager for untrusted receive instead of disabling the check
+        // TBD: test for cases involving networking exception events (i.e. do they get thrown/logged properly)
         try (var receiver = new DatagramReceiver();
              var sender = new DatagramSender(receiver.port())) {
             Thread t1 = new Thread(sender, "Sender-Thread");
@@ -92,7 +95,7 @@ class TestDatagramChannelEvents {
 
         @Override
         public void run() {
-            var buffer = ByteBuffer.wrap(new byte[] { (byte)0xFF });
+            var buffer = ByteBuffer.wrap(new byte[10]);
             buffer.flip();
             try {
                 InetAddress addr = InetAddress.getLoopbackAddress();
@@ -131,7 +134,7 @@ class TestDatagramChannelEvents {
 
         @Override
         public void run() {
-            var buffer = ByteBuffer.wrap(new byte[1]);
+            var buffer = ByteBuffer.wrap(new byte[10]);
             try {
                 receiver.receive(buffer);
                 // no need to process buffer as only testing events
