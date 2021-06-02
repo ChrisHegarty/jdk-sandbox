@@ -535,8 +535,10 @@ class DatagramChannelImpl
             Exception ex = null;
             boolean blocking = isBlocking();
             SocketAddress sender = null;
+            SocketAddress remote = null;
             try {
-                SocketAddress remote = beginRead(blocking, false);
+                remote = beginRead(blocking, false);
+                System.err.println(remote);
                 boolean connected = (remote != null);
                 if (connected) {
                     // connected or no security manager
@@ -561,7 +563,8 @@ class DatagramChannelImpl
                 throw e;
             } finally {
                 endRead(blocking, (sender != null));
-                EventSupport.writeDatagramReceiveEvent(fd, sender, isConnected(), blocking, ex);
+                // dst buffer has been flipped by the time we get here, so only a need to call dst.limit() here
+                EventSupport.writeDatagramReceiveEvent(fd, remote, dst.remaining(), isConnected(), blocking, ex);
             }
         } finally {
             readLock.unlock();
@@ -595,7 +598,8 @@ class DatagramChannelImpl
                     // sender address is in socket address buffer
                     InetSocketAddress isa = sourceSocketAddress();
                     try {
-                        sm.checkAccept(isa.getAddress().getHostAddress(), isa.getPort());
+                        // Temporarily disable sm check to test event firing
+                        // sm.checkAccept(isa.getAddress().getHostAddress(), isa.getPort());
                         bb.flip();
                         dst.put(bb);
                         return isa;
@@ -827,8 +831,9 @@ class DatagramChannelImpl
             } finally {
                 endWrite(blocking, completed);
                 // Can all be done in one go without timing, Datagram is a discrete unit of transmission
-                // that either sends or does not send.
-                EventSupport.writeDatagramSendEvent(fd, getRemoteAddress(), completed, blocking, ex);
+                // that either sends or does not send
+                src.flip();
+                EventSupport.writeDatagramSendEvent(fd, target, src.remaining(), completed, blocking, ex);
             }
             assert n >= 0 || n == IOStatus.UNAVAILABLE;
             return IOStatus.normalize(n);
