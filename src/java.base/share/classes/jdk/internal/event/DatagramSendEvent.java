@@ -29,5 +29,4 @@ public class DatagramSendEvent extends AbstractSocketEvent {
     public int bytesSent;
     public boolean completed;
     public boolean blocking;
-    public String exceptionMessage;
 }

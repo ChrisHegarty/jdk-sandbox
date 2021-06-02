@@ -21,7 +21,4 @@ public class DatagramReceiveEvent extends AbstractSocketEvent {
 
     @Label("Blocking Operations")
     public boolean blocking;
-
-    @Label("Exception Message")
-    public String exceptionMessage;
 }
