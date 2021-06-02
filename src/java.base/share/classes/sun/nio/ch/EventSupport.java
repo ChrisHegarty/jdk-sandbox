@@ -35,6 +35,7 @@ import jdk.internal.access.SharedSecrets;
 import jdk.internal.event.AbstractSocketEvent;
 import jdk.internal.event.DatagramReceiveEvent;
 import jdk.internal.event.DatagramSendEvent;
+import jdk.internal.event.NetworkingExceptionEvent;
 import jdk.internal.event.SocketAcceptEvent;
 import jdk.internal.event.SocketAcceptEndEvent;
 import jdk.internal.event.SocketAcceptStartEvent;
@@ -128,42 +129,65 @@ class EventSupport {
 
     static void writeDatagramReceiveEvent(FileDescriptor fd,
                                           SocketAddress addr,
+                                          int bytesRead,
                                           boolean connected,
                                           boolean blocking,
                                           Exception ex) {
+        if (ex != null) {
+            // Experimental
+            writeNetworkingExceptionEvent(ex);
+            return;
+        }
         var event = new DatagramReceiveEvent();
         if (event.shouldCommit()) {
             event.id = fdOrZero(fd);
-            setAddress(event, addr);
+            event.bytesRead = bytesRead;
+            if (connected) {
+                setAddress(event, addr);
+            } else {
+                // Accounts for the case of an untrusted/unconnected
+                // receive with security manager
+                event.host = "N/A";
+                event.address = "N/A";
+                event.port = -1;
+            }
             event.connected = connected;
             event.blocking = blocking;
-            event.exceptionMessage = stringifyOrNull(ex);
             event.commit();
         }
     }
 
     static void writeDatagramSendEvent(FileDescriptor fd,
                                        SocketAddress addr,
+                                       int bytesSent,
                                        boolean completed,
                                        boolean blocking,
                                        Exception ex) {
-        if (ex == null) {
-            var event = new DatagramSendEvent();
-            if (event.shouldCommit()) {
-                event.id = fdOrZero(fd);
-                setAddress(event, addr);
-                event.completed = completed;
-                event.blocking = blocking;
-                event.exceptionMessage = stringifyOrNull(ex);
-                event.commit();
-            }
-        } else {
-//            var event = new DatagramExceptionEvent(); //Way too specific but illustrates it
-//            if (event.shouldCommit) {
-//                event.id = fdOrZero(fd);
-//                event.exceptionMessage = exceptionMessage;
-//                event.commit();
-//            }
+        if (ex != null) {
+            // Experimental
+            writeNetworkingExceptionEvent(ex);
+            return;
+        }
+        var event = new DatagramSendEvent();
+        if (event.shouldCommit()) {
+            event.id = fdOrZero(fd);
+            event.bytesSent = bytesSent;
+            // Conditional branching for setAddress above is uneccessary here
+            // as remote address is always specified
+            setAddress(event, addr);
+            event.completed = completed;
+            event.blocking = blocking;
+            event.commit();
+        }
+    }
+
+    static void writeNetworkingExceptionEvent(Exception ex) {
+        var event = new NetworkingExceptionEvent();
+        if (event.shouldCommit()) {
+            event.cause = (ex.getCause() != null) ? ex.getCause().toString() : "null";
+            event.toString = ex.toString();
+            event.message = ex.getMessage();
+            event.commit();
         }
     }
 
@@ -183,7 +207,7 @@ class EventSupport {
 
     private static void setAddress(AbstractSocketEvent event, SocketAddress addr) {
         if (addr instanceof InetSocketAddress isa) {
-            String hostString  = isa.getAddress().toString();
+            String hostString = isa.getAddress().toString();
             int delimiterIndex = hostString.lastIndexOf('/');
 
             event.host = hostString.substring(0, delimiterIndex);
